@@ -414,11 +414,11 @@ void IMoveAction::apply(InventoryManager *mgr, ServerActiveObject *player, IGame
 			ItemStack dst_item = list_to->getItem(to_i);
 			swapDirections();
 
-			int src_can_take = allowPut(dst_item, player);
-			int dst_can_put = allowTake(dst_item, player);
+			int dst_can_take = allowTake(dst_item, player);
+			int src_can_put = allowPut(dst_item, player);
 			allow_swap = allow_swap
-				&& (src_can_take == -1 || src_can_take >= dst_item.count)
-				&& (dst_can_put == -1 || dst_can_put >= dst_item.count);
+				&& (dst_can_take == -1 || dst_can_take >= dst_item.count)
+				&& (src_can_put == -1 || src_can_put >= dst_item.count);
 			swapDirections();
 		}
 		if (swap_expected != allow_swap)
@@ -436,6 +436,97 @@ void IMoveAction::apply(InventoryManager *mgr, ServerActiveObject *player, IGame
 	// allow_* callbacks should not modify the stack - but if they do - handle that.
 	if (move_count > list_from->getItem(from_i).count)
 		move_count = list_from->getItem(from_i).count;
+
+	// reverse_ma is only usable when would_swap == true
+	bool would_swap = false;
+	IMoveAction reverse_ma;  // Default constructed - fields initialized by default constructor
+
+	if (count != 0) {
+		ItemStack item1 = list_from->getItem(from_i);
+		if (!item1.empty()) {
+			ItemStack leftover;
+			list_to->itemFits(to_i, item1, &leftover);
+
+			if (!leftover.empty()
+					&& leftover.name == item1.name
+					&& leftover.count == item1.count
+					&& !caused_by_move_somewhere) {
+
+				reverse_ma.from_inv = to_inv;
+				reverse_ma.from_list = to_list;
+				reverse_ma.from_i = to_i;
+
+				reverse_ma.to_inv = from_inv;
+				reverse_ma.to_list = from_list;
+				reverse_ma.to_i = from_i;
+
+				would_swap = true;
+			}
+		}
+	}
+
+	if (would_swap) {
+		// If a swap will be performed, call allow callbacks for the reverse-side
+		// of the inventory swap.
+
+		ItemStack dst_item = list_to->getItem(to_i);
+		ServerScripting *sa = PLAYER_TO_SA(player);
+
+		if (from_inv == to_inv) {
+			// Same inventory - use AllowMove for reverse
+			if (from_inv.type == InventoryLocation::DETACHED) {
+				s32 src_can_take_count2 = sa->detached_inventory_AllowMove(
+						reverse_ma, dst_item.count, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			} else if (from_inv.type == InventoryLocation::NODEMETA) {
+				s32 src_can_take_count2 = sa->nodemeta_inventory_AllowMove(
+						reverse_ma, dst_item.count, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			} else if (from_inv.type == InventoryLocation::PLAYER) {
+				s32 src_can_take_count2 = sa->player_inventory_AllowMove(
+						reverse_ma, dst_item.count, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			}
+		} else {
+			// Different inventories - call AllowTake and AllowPut for reverse direction
+			// reverse_ma goes from to_inv to from_inv, so:
+			// AllowTake from to_inv (where we're taking the item back)
+			// AllowPut to from_inv (where we're putting the item back)
+
+			if (to_inv.type == InventoryLocation::DETACHED) {
+				s32 src_can_take_count2 = sa->detached_inventory_AllowTake(
+						reverse_ma, dst_item, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			}
+			if (to_inv.type == InventoryLocation::NODEMETA) {
+				s32 src_can_take_count2 = sa->nodemeta_inventory_AllowTake(
+						reverse_ma, dst_item, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			}
+			if (to_inv.type == InventoryLocation::PLAYER) {
+				s32 src_can_take_count2 = sa->player_inventory_AllowTake(
+						reverse_ma, dst_item, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			}
+
+			if (from_inv.type == InventoryLocation::DETACHED) {
+				s32 src_can_take_count2 = sa->detached_inventory_AllowPut(
+						reverse_ma, dst_item, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			}
+			if (from_inv.type == InventoryLocation::NODEMETA) {
+				s32 src_can_take_count2 = sa->nodemeta_inventory_AllowPut(
+						reverse_ma, dst_item, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			}
+			if (from_inv.type == InventoryLocation::PLAYER) {
+				s32 src_can_take_count2 = sa->player_inventory_AllowPut(
+						reverse_ma, dst_item, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			}
+		}
+		dst_can_put_count = src_can_take_count;
+	}
 
 	/* If no items will be moved, don't go further */
 	if (move_count == 0) {
@@ -474,7 +565,7 @@ void IMoveAction::apply(InventoryManager *mgr, ServerActiveObject *player, IGame
 		list_to.get(), to_i, move_count, allow_swap, &did_swap);
 	move_count = src_item.count;
 
-	assert(allow_swap == did_swap);
+	assert(would_swap == did_swap);
 
 	// If source is infinite, reset its stack
 	if (src_can_take_count == -1) {
