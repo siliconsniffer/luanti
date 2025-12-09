@@ -417,7 +417,7 @@ set(independent_SRCS
 	face_position_cache.cpp
 	gettext_plural_form.cpp
 	httpfetch.cpp
-	hud.cpp
+	hud_element.cpp
 	inventory.cpp
 	itemstackmetadata.cpp
 	log.cpp
@@ -433,6 +433,7 @@ set(independent_SRCS
 	profiler.cpp
 	serialization.cpp
 	settings.cpp
+	sound_spec.cpp
 	staticobject.cpp
 	terminal_chat_console.cpp
 	texture_override.cpp
@@ -698,6 +699,7 @@ if(BUILD_CLIENT)
 		${GMP_LIBRARY}
 		${JSON_LIBRARY}
 		${LUA_BIT_LIBRARY}
+		lstrpack
 		sha256
 		${FREETYPE_LIBRARY}
 		${PLATFORM_LIBS}
@@ -788,6 +790,7 @@ if(BUILD_SERVER)
 		${JSON_LIBRARY}
 		${LUA_LIBRARY}
 		${LUA_BIT_LIBRARY}
+		lstrpack
 		sha256
 		${GMP_LIBRARY}
 		${PLATFORM_LIBS}
