@@ -64,6 +64,18 @@ enum EGUI_ELEMENT_TYPE
 	//! The root of the GUI
 	EGUIET_ROOT,
 
+	//! Scroll container (custom, for swipe support)
+	EGUIET_CUSTOM_SCROLLCONTAINER,
+
+	//! GUI table (custom, for swipe support)
+	EGUIET_CUSTOM_GUITABLE,
+
+	//! Scroll bar (custom, for swipe support)
+	EGUIET_CUSTOM_SCROLLBAR,
+
+	//! Hypertext (custom, for swipe support)
+	EGUIET_CUSTOM_HYPERTEXT,
+
 	//! Not an element, amount of elements in there
 	EGUIET_COUNT,
 

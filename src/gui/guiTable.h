@@ -241,4 +241,10 @@ protected:
 	// align = 0: left aligned, 1: centered, 2: right aligned, 3: inline
 	static void alignContent(Cell *cell, s32 xmax, s32 content_width,
 			s32 align);
+
+private:
+	// Touch/swipe gesture tracking
+	bool m_swipe_started = false;
+	int m_swipe_start_y = -1;
+	float m_swipe_pos = 0.0f;
 };

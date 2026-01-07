@@ -44,4 +44,9 @@ private:
 	f32 m_scrollfactor; //< scrollbar pos * scrollfactor = scroll offset in pixels
 	std::optional<s32> m_content_padding_px; //< in pixels
 
+	// Touch/swipe gesture tracking
+	bool m_swipe_started = false;
+	int m_swipe_start_y = -1;
+	float m_swipe_pos = 0.0f;
+
 };

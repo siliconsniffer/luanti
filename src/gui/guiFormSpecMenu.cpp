@@ -3912,7 +3912,11 @@ void GUIFormSpecMenu::acceptInput(FormspecQuitMode quitmode)
 				} else if (s.ftype == f_ScrollBar) {
 					IGUIElement *element = getElementFromId(s.fid, true);
 					GUIScrollBar *e = nullptr;
+	#ifdef HAVE_TOUCHSCREENGUI
+					if (element && element->getType() == gui::EGUIET_CUSTOM_SCROLLBAR)
+	#else
 					if (element && element->getType() == gui::EGUIET_SCROLL_BAR)
+	#endif
 						e = static_cast<GUIScrollBar *>(element);
 
 					if (e) {
@@ -3993,6 +3997,53 @@ bool GUIFormSpecMenu::preprocessEvent(const SEvent& event)
 		}
 	}
 	// Mouse wheel and move events: send to hovered element instead of focused
+#ifdef HAVE_TOUCHSCREENGUI
+	// If element is inside scroll container/table/hypertext,
+	// send event there first for swipe handling
+	if (event.EventType == EET_MOUSE_INPUT_EVENT) {
+		s32 x = event.MouseInput.X;
+		s32 y = event.MouseInput.Y;
+		gui::IGUIElement *hovered =
+			Environment->getRootGUIElement()->getElementFromPoint(
+				core::position2d<s32>(x, y));
+
+		if (hovered && isMyChild(hovered)) {
+			gui::IGUIElement *element = hovered;
+
+			// Don't process swipe if directly on scrollbar or edit box
+			if (element->getType() != gui::EGUIET_SCROLL_BAR &&
+					element->getType() != gui::EGUIET_CUSTOM_SCROLLBAR &&
+					element->getType() != gui::EGUIET_EDIT_BOX &&
+					element->getType() != gui::EGUIET_CUSTOM_SCROLLCONTAINER &&
+					element->getType() != gui::EGUIET_CUSTOM_GUITABLE &&
+					element->getType() != gui::EGUIET_CUSTOM_HYPERTEXT) {
+
+				// Walk up the tree looking for a scrollable container
+				while (element) {
+					element = element->getParent();
+					if (!element)
+						break;
+
+					// Stop if we hit a scrollbar or edit box
+					if (element->getType() == gui::EGUIET_SCROLL_BAR ||
+							element->getType() == gui::EGUIET_CUSTOM_SCROLLBAR ||
+							element->getType() == gui::EGUIET_EDIT_BOX)
+						break;
+
+					// Found a scrollable container - send event to it
+					if (element->getType() == gui::EGUIET_CUSTOM_SCROLLCONTAINER ||
+							element->getType() == gui::EGUIET_CUSTOM_GUITABLE ||
+							element->getType() == gui::EGUIET_CUSTOM_HYPERTEXT) {
+						if (element->OnEvent(event))
+							return true;
+						break;
+					}
+				}
+			}
+		}
+	}
+#endif
+
 	if (event.EventType == EET_MOUSE_INPUT_EVENT &&
 			(event.MouseInput.Event == EMIE_MOUSE_WHEEL ||
 			(event.MouseInput.Event == EMIE_MOUSE_MOVED &&

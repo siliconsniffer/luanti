@@ -214,4 +214,9 @@ protected:
 
 	ParsedText::Element *getElementAt(s32 X, s32 Y);
 	void checkHover(s32 X, s32 Y);
+
+	// Touch/swipe gesture tracking
+	bool m_swipe_started = false;
+	int m_swipe_start_y = -1;
+	float m_swipe_pos = 0.0f;
 };

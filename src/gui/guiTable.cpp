@@ -28,7 +28,11 @@ GUITable::GUITable(gui::IGUIEnvironment *env,
 		core::rect<s32> rectangle,
 		ISimpleTextureSource *tsrc
 ):
+#ifdef HAVE_TOUCHSCREENGUI
+	gui::IGUIElement(gui::EGUIET_CUSTOM_GUITABLE, env, parent, id, rectangle),
+#else
 	gui::IGUIElement(gui::EGUIET_TABLE, env, parent, id, rectangle),
+#endif
 	m_tsrc(tsrc)
 {
 	assert(tsrc != NULL);
@@ -55,6 +59,10 @@ GUITable::GUITable(gui::IGUIEnvironment *env,
 			gui::EGUIA_UPPERLEFT, gui::EGUIA_LOWERRIGHT);
 	m_scrollbar->setVisible(false);
 	m_scrollbar->setPos(0);
+
+	m_swipe_started = false;
+	m_swipe_start_y = -1;
+	m_swipe_pos = 0.0f;
 
 	setTabStop(true);
 	setTabOrder(-1);
@@ -889,17 +897,62 @@ bool GUITable::OnEvent(const SEvent &event)
 		// Update tooltip
 		setToolTipText(cell ? m_strings[cell->tooltip_index].c_str() : L"");
 
+#ifdef HAVE_TOUCHSCREENGUI
+		// Handle swipe gesture
+		if (event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN) {
+			if (isPointInside(core::position2d<s32>(event.MouseInput.X, event.MouseInput.Y))) {
+				s32 totalheight = m_rowheight * m_visible_rows.size();
+				float scale = (float)(totalheight - AbsoluteRect.getHeight()) /
+						(m_scrollbar->getMax() - m_scrollbar->getMin());
+				m_swipe_start_y = event.MouseInput.Y + m_scrollbar->getPos() / scale;
+			}
+		} else if (event.MouseInput.Event == EMIE_LMOUSE_LEFT_UP) {
+			m_swipe_start_y = -1;
+			if (m_swipe_started) {
+				m_swipe_started = false;
+				return true;
+			}
+		} else if (event.MouseInput.Event == EMIE_MOUSE_MOVED) {
+			double screen_dpi = RenderingEngine::getDisplayDensity() * 96;
+			s32 totalheight = m_rowheight * m_visible_rows.size();
+			float scale = (float)(totalheight - AbsoluteRect.getHeight()) /
+					(m_scrollbar->getMax() - m_scrollbar->getMin());
+
+			if (!m_swipe_started && m_swipe_start_y != -1 &&
+					std::abs(m_swipe_start_y - event.MouseInput.Y - 
+							m_scrollbar->getPos() / scale) > 0.1 * screen_dpi) {
+				m_swipe_started = true;
+				Environment->setFocus(this);
+			}
+
+			if (m_swipe_started) {
+				m_swipe_pos = (float)(m_swipe_start_y - event.MouseInput.Y) * scale;
+				m_scrollbar->setPos((int)m_swipe_pos);
+				return true;
+			}
+		}
+#endif
+
 		// Fix for #1567/#1806:
 		// GUIScrollBar passes double click events to its parent,
 		// which we don't want. Detect this case and discard the event
-		if (event.MouseInput.Event != EMIE_MOUSE_MOVED &&
-				m_scrollbar->isVisible() &&
-				m_scrollbar->isPointInside(p))
-			return true;
+		if (m_scrollbar->isVisible() && m_scrollbar->isPointInside(p)) {
+			if (event.MouseInput.Event >= EMIE_LMOUSE_DOUBLE_CLICK &&
+					event.MouseInput.Event <= EMIE_MMOUSE_TRIPLE_CLICK)
+				return true;
+			else
+				return false;
+		}
 
+#ifdef HAVE_TOUCHSCREENGUI
+		if (isPointInside(p) && (event.MouseInput.Event == EMIE_LMOUSE_LEFT_UP ||
+				event.MouseInput.Event == EMIE_LMOUSE_DOUBLE_CLICK ||
+				event.MouseInput.Event == EMIE_LMOUSE_TRIPLE_CLICK)) {
+#else
 		if (event.MouseInput.isLeftPressed() &&
 				(isPointInside(p) ||
 				 event.MouseInput.Event == EMIE_MOUSE_MOVED)) {
+#endif
 			s32 sel_column = 0;
 			bool sel_doubleclick = (event.MouseInput.Event
 					== EMIE_LMOUSE_DOUBLE_CLICK);
@@ -908,7 +961,11 @@ bool GUITable::OnEvent(const SEvent &event)
 			// For certain events (left click), report column
 			// Also open/close subtrees when the +/- is clicked
 			if (cell && (
+#ifdef HAVE_TOUCHSCREENGUI
+					event.MouseInput.Event == EMIE_LMOUSE_LEFT_UP ||
+#else
 					event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN ||
+#endif
 					event.MouseInput.Event == EMIE_LMOUSE_DOUBLE_CLICK ||
 					event.MouseInput.Event == EMIE_LMOUSE_TRIPLE_CLICK)) {
 				sel_column = cell->reported_column;
@@ -917,7 +974,11 @@ bool GUITable::OnEvent(const SEvent &event)
 			}
 
 			if (plusminus_clicked) {
+#ifdef HAVE_TOUCHSCREENGUI
+				if (event.MouseInput.Event == EMIE_LMOUSE_LEFT_UP) {
+#else
 				if (event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN) {
+#endif
 					toggleVisibleTree(row_i, 0, false);
 				}
 			}

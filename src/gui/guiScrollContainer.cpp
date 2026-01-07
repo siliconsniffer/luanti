@@ -7,7 +7,11 @@
 GUIScrollContainer::GUIScrollContainer(gui::IGUIEnvironment *env,
 		gui::IGUIElement *parent, s32 id, const core::rect<s32> &rectangle,
 		const std::string &orientation, f32 scrollfactor) :
+#ifdef HAVE_TOUCHSCREENGUI
+		gui::IGUIElement(gui::EGUIET_CUSTOM_SCROLLCONTAINER, env, parent, id, rectangle),
+#else
 		gui::IGUIElement(gui::EGUIET_ELEMENT, env, parent, id, rectangle),
+#endif
 		m_scrollbar(nullptr), m_scrollfactor(scrollfactor)
 {
 	if (orientation == "vertical")
@@ -16,6 +20,10 @@ GUIScrollContainer::GUIScrollContainer(gui::IGUIEnvironment *env,
 		m_orientation = HORIZONTAL;
 	else
 		m_orientation = UNDEFINED;
+
+	m_swipe_started = false;
+	m_swipe_start_y = -1;
+	m_swipe_pos = 0.0f;
 }
 
 bool GUIScrollContainer::OnEvent(const SEvent &event)
@@ -37,6 +45,56 @@ bool GUIScrollContainer::OnEvent(const SEvent &event)
 
 		return retval;
 	}
+
+#ifdef HAVE_TOUCHSCREENGUI
+	if (event.EventType == EET_MOUSE_INPUT_EVENT && m_scrollbar) {
+		if (event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN) {
+			// Only start swipe if press is inside the container
+			if (isPointInside(core::position2d<s32>(
+					event.MouseInput.X, event.MouseInput.Y))) {
+				m_swipe_start_y = event.MouseInput.Y -
+						  m_scrollbar->getPos() * m_scrollfactor;
+			}
+		} else if (event.MouseInput.Event == EMIE_LMOUSE_LEFT_UP) {
+			m_swipe_start_y = -1;
+			if (m_swipe_started) {
+				m_swipe_started = false;
+				return true;
+			}
+		} else if (event.MouseInput.Event == EMIE_MOUSE_MOVED) {
+			if (m_orientation != VERTICAL)
+				return IGUIElement::OnEvent(event);
+
+			double screen_dpi = RenderingEngine::getDisplayDensity() * 96;
+
+			// Start swipe if movement threshold exceeded
+			if (!m_swipe_started && m_swipe_start_y != -1 &&
+					std::abs(m_swipe_start_y - event.MouseInput.Y +
+							m_scrollbar->getPos() * m_scrollfactor) >
+							0.1 * screen_dpi) {
+				m_swipe_started = true;
+				Environment->setFocus(this);
+			}
+
+			// Update scroll position during swipe
+			if (m_swipe_started) {
+				m_swipe_pos = (float)(event.MouseInput.Y - m_swipe_start_y) /
+					      m_scrollfactor;
+				m_scrollbar->setPos((int)m_swipe_pos);
+
+				// Trigger scroll event
+				SEvent e;
+				e.EventType = EET_GUI_EVENT;
+				e.GUIEvent.Caller = m_scrollbar;
+				e.GUIEvent.Element = nullptr;
+				e.GUIEvent.EventType = EGET_SCROLL_BAR_CHANGED;
+				OnEvent(e);
+
+				return true;
+			}
+		}
+	}
+#endif
 
 	return IGUIElement::OnEvent(event);
 }
