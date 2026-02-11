@@ -4281,9 +4281,8 @@ bool GUIFormSpecMenu::OnEvent(const SEvent& event)
 				hotbar_size = m_client->getEnv().getLocalPlayer()->hud_hotbar_itemcount;
 			}
 
-			char keymap_slot_idx[16];
 			for (u32 i = 1; i <= (u32)hotbar_size; i++) {
-				if (keySettingHasMatch(keymap_slot_idx, kp)) {
+				if (keySettingHasMatch("keymap_slot" + std::to_string(i), kp)){
 					invswap = i;
 					break;
 				}
