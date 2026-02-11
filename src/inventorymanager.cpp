@@ -437,6 +437,62 @@ void IMoveAction::apply(InventoryManager *mgr, ServerActiveObject *player, IGame
 	if (move_count > list_from->getItem(from_i).count)
 		move_count = list_from->getItem(from_i).count;
 
+	// reverse_ma is only usable when would_swap == true
+	bool would_swap = false;
+	IMoveAction reverse_ma;  // Default constructed - fields initialized by default constructor
+
+	if (count != 0) {
+		ItemStack item1 = list_from->getItem(from_i);
+		if (!item1.empty()) {
+			ItemStack leftover;
+			list_to->itemFits(to_i, item1, &leftover);
+
+			if (!leftover.empty()
+					&& leftover.name == item1.name
+					&& leftover.count == item1.count
+					&& !caused_by_move_somewhere) {
+
+				reverse_ma.from_inv = to_inv;
+				reverse_ma.from_list = to_list;
+				reverse_ma.from_i = to_i;
+
+				reverse_ma.to_inv = from_inv;
+				reverse_ma.to_list = from_list;
+				reverse_ma.to_i = from_i;
+
+				would_swap = true;
+			}
+		}
+	}
+
+	if (would_swap) {
+		// If a swap will be performed, call allow callbacks for the reverse-side
+		// of the inventory swap.
+
+		ItemStack dst_item = list_to->getItem(to_i);
+		ServerScripting *sa = PLAYER_TO_SA(player);
+
+		if (from_inv == to_inv) {
+			// Same inventory - use AllowMove for reverse
+			if (from_inv.type == InventoryLocation::DETACHED) {
+				s32 src_can_take_count2 = sa->detached_inventory_AllowMove(
+						reverse_ma, dst_item.count, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			} else if (from_inv.type == InventoryLocation::NODEMETA) {
+				s32 src_can_take_count2 = sa->nodemeta_inventory_AllowMove(
+						reverse_ma, dst_item.count, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			} else if (from_inv.type == InventoryLocation::PLAYER) {
+				s32 src_can_take_count2 = sa->player_inventory_AllowMove(
+						reverse_ma, dst_item.count, player);
+				src_can_take_count = std::min(src_can_take_count, src_can_take_count2);
+			}
+			dst_can_put_count = src_can_take_count;
+		}
+		// For different inventories, allow callbacks for swap were already called in the
+		// swap check at line ~407-421, so we don't call them again here
+	}
+
 	/* If no items will be moved, don't go further */
 	if (move_count == 0) {
 		// Undo client prediction. See 'clientApply'
@@ -474,7 +530,7 @@ void IMoveAction::apply(InventoryManager *mgr, ServerActiveObject *player, IGame
 		list_to.get(), to_i, move_count, allow_swap, &did_swap);
 	move_count = src_item.count;
 
-	assert(allow_swap == did_swap);
+	assert(would_swap == did_swap);
 
 	// If source is infinite, reset its stack
 	if (src_can_take_count == -1) {

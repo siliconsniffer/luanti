@@ -30,6 +30,8 @@
 #include "porting.h"
 #include "settings.h"
 #include "client/client.h"
+#include "client/localplayer.h"
+#include "hud_element.h"
 #include "client/fontengine.h"
 #include "client/sound.h"
 #include "util/numeric.h"
@@ -4187,10 +4189,14 @@ void GUIFormSpecMenu::trySubmitClose()
 
 bool GUIFormSpecMenu::OnEvent(const SEvent& event)
 {
+	s32 invdrop = 0;
+	s32 invswap = 0;
+	bool shift_held = false;
 	if (event.EventType==EET_KEY_INPUT_EVENT) {
 		KeyPress kp(event.KeyInput);
 		// Ctrl (+ Shift) + Tab: Select the (previous or) next tab of a TabControl instance.
 		bool shift = event.KeyInput.Shift;
+		shift_held = shift;
 		bool ctrl = event.KeyInput.Control;
 		if (event.KeyInput.PressedDown && (event.KeyInput.Key == KEY_TAB && ctrl)) {
 			// Try to find a tab control among our elements
@@ -4264,13 +4270,33 @@ bool GUIFormSpecMenu::OnEvent(const SEvent& event)
 			return true;
 		}
 
+		if (event.KeyInput.PressedDown &&
+			keySettingHasMatch("keymap_drop", kp)) {
+			invdrop = 1;
+		}
+		if (event.KeyInput.PressedDown) {
+			s32 hotbar_size = HUD_HOTBAR_ITEMCOUNT_MAX; // default fallback
+
+			if (m_client && m_client->getEnv().getLocalPlayer()) {
+				hotbar_size = m_client->getEnv().getLocalPlayer()->hud_hotbar_itemcount;
+			}
+
+			char keymap_slot_idx[16];
+			for (u32 i = 1; i <= (u32)hotbar_size; i++) {
+				if (keySettingHasMatch(keymap_slot_idx, kp)) {
+					invswap = i;
+					break;
+				}
+			}
+		}
+
 	}
 
 	/* Mouse event other than movement, or crossing the border of inventory
 	   field while holding left, right, or middle mouse button
 	   or touch event (for touch screen devices)
 	 */
-	if ((event.EventType == EET_MOUSE_INPUT_EVENT &&
+	if (invdrop || invswap || (event.EventType == EET_MOUSE_INPUT_EVENT &&
 			(event.MouseInput.Event != EMIE_MOUSE_MOVED ||
 				((event.MouseInput.isLeftPressed() ||
 					event.MouseInput.isRightPressed() ||
@@ -4294,6 +4320,10 @@ bool GUIFormSpecMenu::OnEvent(const SEvent& event)
 			sanity_check(inv_selected);
 			list_selected = inv_selected->getList(m_selected_item->listname);
 			sanity_check(list_selected);
+		}
+
+		if (invdrop || invswap) {
+			inv_selected = m_invmgr->getInventory(s.inventoryloc);
 		}
 
 		u32 s_count = 0;
@@ -4405,6 +4435,10 @@ bool GUIFormSpecMenu::OnEvent(const SEvent& event)
 
 		// Set this number to a positive value to generate a craft action at s.
 		u32 craft_amount = 0;
+
+		if (invdrop || invswap) {
+			updown = BET_OTHER; button = BET_OTHER;
+		}
 
 		switch (updown) {
 		case BET_DOWN: {
@@ -4935,6 +4969,82 @@ bool GUIFormSpecMenu::OnEvent(const SEvent& event)
 			// Formspecs usually close when you click outside them, we absorb
 			// the event to prevent that. See GUIModalMenu::remapClickOutside.
 			absorb_event = true;
+
+		} else if (invdrop) {
+			do {
+				if (!s.isValid() || !inv_selected || s.listname == "craftpreview")
+					break;
+
+				InventoryList *list_from = inv_selected->getList(s.listname);
+				assert(list_from);
+				ItemStack stack_from = list_from->getItem(s.i);
+
+				// Drop entire stack by default, only 1 item with shift
+				drop_amount = shift_held ? 1 : stack_from.count;
+				// Check how many items can be dropped
+				drop_amount = MYMIN(drop_amount, stack_from.count);
+
+				infostream << "Handing IAction::Drop to manager" << std::endl;
+				IDropAction *a = new IDropAction();
+				a->count = drop_amount;
+				a->from_inv = s.inventoryloc;
+				a->from_list = s.listname;
+				a->from_i = s.i;
+				m_invmgr->inventoryAction(a);
+			} while (0);
+		} else if (invswap >= 1 && invswap <= 10) {
+			u32 idx = invswap - 1;  // Convert from 1-10 to 0-9 for array index
+			u32 mis = m_inventory_rings.size();
+			s32 player_inv_ind = -1;
+
+			for (u32 i = 0; i < mis; i++) {
+				const ListRingSpec &sp = m_inventory_rings[i];
+				if (sp.inventoryloc.type == InventoryLocation::CURRENT_PLAYER
+					&& sp.listname == "main") {
+					player_inv_ind = i;
+				}
+			}
+			do {
+				if (player_inv_ind < 0)
+					break;
+				if (!s.isValid() || !inv_selected || s.listname == "craftpreview")
+					break;
+
+				const ListRingSpec &to_inv_sp = m_inventory_rings[player_inv_ind];
+				InventoryList *list_from = list_s;
+
+				Inventory *inv_to = m_invmgr->getInventory(to_inv_sp.inventoryloc);
+				if (!inv_to)
+					break;
+				InventoryList *list_to = inv_to->getList(to_inv_sp.listname);
+				if (!list_to)
+					break;
+
+				ItemStack stack_src = list_from->getItem(s.i);
+				ItemStack stack_dest = list_to->getItem(idx);
+
+				infostream << "Handing IAction::Move to manager" << std::endl;
+				IMoveAction *a = new IMoveAction();
+
+				if (stack_src.empty()) {
+					a->count = stack_dest.count;
+					a->from_inv = to_inv_sp.inventoryloc;
+					a->from_list = to_inv_sp.listname;
+					a->from_i = idx;
+					a->to_inv = s.inventoryloc;
+					a->to_list = s.listname;
+					a->to_i = s.i;
+				} else {
+					a->count = stack_src.count;
+					a->from_inv = s.inventoryloc;
+					a->from_list = s.listname;
+					a->from_i = s.i;
+					a->to_inv = to_inv_sp.inventoryloc;
+					a->to_list = to_inv_sp.listname;
+					a->to_i = idx;
+				}
+				m_invmgr->inventoryAction(a);
+			} while (0);
 
 		} else if (craft_amount > 0) {
 			assert(s.isValid());
