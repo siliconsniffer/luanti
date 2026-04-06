@@ -278,6 +278,8 @@ keymap_toggle_fog (Toggle fog) key SYSTEM_SCANCODE_60
 
 keymap_toggle_debug (Toggle debug info) key SYSTEM_SCANCODE_62
 
+keymap_toggle_nametags (Toggle nametags) key
+
 #    Key for toggling the display of the profiler. Used for development.
 keymap_toggle_profiler (Toggle profiler) key SYSTEM_SCANCODE_63
 
@@ -911,6 +913,13 @@ hud_scaling (HUD scaling) float 1.0 0.5 20
 #    Whether name tag backgrounds should be shown by default.
 #    Mods may still set a background.
 show_nametag_backgrounds (Show name tag backgrounds by default) bool true
+
+#    Controls when player nametags are drawn above characters.
+#    - show: always show nametags (default)
+#    - hide: never show nametags
+#    - hide_with_shift: hide nametags while holding the Sneak/Shift key
+#    Note: This is a client-side visibility toggle (separate from the HUD toggle).
+show_nametags (Show nametags) enum show show,hide,hide_with_shift
 
 #    Whether to show the client debug info (has the same effect as hitting F5).
 show_debug (Show debug info) bool false

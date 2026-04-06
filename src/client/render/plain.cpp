@@ -49,7 +49,20 @@ void DrawHUD::run(PipelineContext &context)
 			context.hud->drawCrosshair();
 
 		context.hud->drawLuaElements(context.client->getCamera()->getOffset());
-		context.client->getCamera()->drawNametags();
+
+		// Nametag visibility mode:
+		//   - show: always show nametags
+		//   - hide: never show nametags
+		//   - hide_with_shift: hide nametags while holding the Sneak/Shift key
+		//
+		// Note: `context.sneak_pressed` must be populated by the input/game layer.
+		const std::string nametag_mode = g_settings->get("show_nametags");
+		const bool should_draw_nametags =
+				(nametag_mode == "show") ||
+				(nametag_mode == "hide_with_shift" && !context.sneak_pressed);
+
+		if (should_draw_nametags)
+			context.client->getCamera()->drawNametags();
 	}
 	context.device->getGUIEnvironment()->drawAll();
 }

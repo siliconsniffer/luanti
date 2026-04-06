@@ -1494,6 +1494,28 @@ void Game::processKeyInput()
 		toggleFog();
 	} else if (wasKeyDown(KeyType::TOGGLE_UPDATE_CAMERA)) {
 		toggleUpdateCamera();
+	} else if (wasKeyPressed(KeyType::TOGGLE_NAMETAGS)) {
+		// Cycle nametag visibility modes.
+		//
+		// Setting: show_nametags (enum: show,hide,hide_with_shift)
+		//
+		// Notes:
+		// - "hide_with_shift" hides nametags only while the Sneak/Shift key is held.
+		// - This hotkey only cycles the enum; rendering behavior is implemented elsewhere.
+		const std::string cur = g_settings->get("show_nametags");
+		const std::string next =
+			(cur == "show") ? "hide" :
+			(cur == "hide") ? "hide_with_shift" :
+			"show";
+
+		g_settings->set("show_nametags", next);
+
+		if (next == "show")
+			m_game_ui->showTranslatedStatusText("Nametags shown");
+		else if (next == "hide")
+			m_game_ui->showTranslatedStatusText("Nametags hidden");
+		else
+			m_game_ui->showTranslatedStatusText("Nametags hidden while holding Shift");
 	} else if (wasKeyPressed(KeyType::CAMERA_MODE)) {
 		camera->toggleCameraMode();
 		updateCameraMode();
@@ -3677,8 +3699,18 @@ void Game::drawScene(ProfilerGraph *graph, RunStats *stats)
 	if (isTouchShootlineUsed())
 		draw_crosshair = false;
 
+	// Cache whether the Sneak/Shift key is currently held so the render pipeline
+	// can implement nametag modes such as "hide while holding shift".
+	// (The render code reads this as a setting gate.)
+	const bool sneak_is_down = isKeyDown(KeyType::SNEAK);
+	g_settings->setBool("nametags_hide_while_shift", sneak_is_down);
+
+	// Pass whether the Sneak/Shift key is currently held into rendering so the
+	// render pipeline can implement modes like "hide nametags while holding Shift".
+	const bool sneak_pressed = isKeyDown(KeyType::SNEAK);
+
 	this->m_rendering_engine->draw_scene(sky_color, this->m_game_ui->m_flags.show_hud,
-			draw_wield_tool, draw_crosshair);
+			draw_wield_tool, draw_crosshair, sneak_pressed);
 
 	/*
 		Profiler graph

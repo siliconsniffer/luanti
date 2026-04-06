@@ -40,6 +40,11 @@ struct PipelineContext
 	bool show_hud {true};
 	bool draw_wield_tool {true};
 	bool draw_crosshair {true};
+
+	// Whether the Sneak key (Shift by default) is currently being held.
+	// Populated by the game/input layer each frame so render steps can
+	// implement "hide/show while holding shift" behaviors.
+	bool sneak_pressed {false};
 };
 
 /**

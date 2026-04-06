@@ -172,6 +172,7 @@ void set_default_settings()
 #else
 	settings->setDefault("keymap_toggle_update_camera", "");
 #endif
+	settings->setDefault("keymap_toggle_nametags", "");
 	settings->setDefault("keymap_toggle_debug", "SYSTEM_SCANCODE_62"); // KEY_F5
 	settings->setDefault("keymap_toggle_profiler", "SYSTEM_SCANCODE_63"); // KEY_F6
 	settings->setDefault("keymap_camera_mode", "SYSTEM_SCANCODE_6"); // KEY_KEY_C
@@ -306,6 +307,7 @@ void set_default_settings()
 	settings->setDefault("arm_inertia", "true");
 	settings->setDefault("hurt_flash_enabled", "true");
 	settings->setDefault("show_nametag_backgrounds", "true");
+	settings->setDefault("show_nametags", "show");
 	settings->setDefault("show_block_bounds_radius_near", "4");
 	settings->setDefault("transparency_sorting_group_by_buffers", "true");
 	settings->setDefault("transparency_sorting_distance", "16");
