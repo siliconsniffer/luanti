@@ -4470,7 +4470,38 @@ bool GUIFormSpecMenu::preprocessEvent(const SEvent& event)
 		}
 	}
 
-	// Fix Esc/Return key being eaten by checkboxen and tables
+	#ifdef __ANDROID__
+	// If element is inside scroll container then send it to scroll container
+	// first so that it can handle swipe gesture
+	if (event.EventType == EET_MOUSE_INPUT_EVENT) {
+		s32 x = event.MouseInput.X;
+		s32 y = event.MouseInput.Y;
+		gui::IGUIElement *hovered =
+			Environment->getRootGUIElement()->getElementFromPoint(
+				core::position2d<s32>(x, y));
+
+		if (hovered && isMyDescendant(hovered)) {
+			IGUIElement *element = hovered->getParent();
+
+			do {
+				if (element &&
+						(element->getType() == gui::EGUIET_CUSTOM_SCROLLCONTAINER ||
+						element->getType() == gui::EGUIET_CUSTOM_GUITABLE)) {
+					bool result = element->OnEvent(event);
+
+					if (result)
+						return true;
+
+					break;
+				}
+
+				element = element->getParent();
+			} while (element);
+		}
+	}
+	#endif
+
+	// Fix Esc/Return key being eaten by checkboxes and tables
 	if (event.EventType == EET_KEY_INPUT_EVENT) {
 			KeyPress kp(event.KeyInput);
 		if (kp == EscapeKey
@@ -4487,6 +4518,7 @@ bool GUIFormSpecMenu::preprocessEvent(const SEvent& event)
 			}
 		}
 	}
+
 	// Mouse wheel and move events: send to hovered element instead of focused
 	if (event.EventType == EET_MOUSE_INPUT_EVENT &&
 			(event.MouseInput.Event == EMIE_MOUSE_WHEEL ||

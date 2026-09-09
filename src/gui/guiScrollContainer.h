@@ -47,6 +47,11 @@ private:
 	GUIScrollBar *m_scrollbar;
 	OrientationEnum m_orientation;
 	f32 m_scrollfactor; //< scrollbar pos * scrollfactor = scroll offset in pixels
+
+	bool m_swipe_started;
+	int m_swipe_start_y;
+	float m_swipe_pos;
+
 	std::optional<s32> m_content_padding_px; //< in pixels
 
 };
