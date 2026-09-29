@@ -136,6 +136,7 @@ endif()
 
 if(BUILD_CLIENT)
 	find_package(Freetype REQUIRED)
+	find_package(Libzip 1.7.2 REQUIRED)
 endif()
 
 option(ENABLE_CURSES "Enable ncurses console" ${BUILD_SERVER})
@@ -311,6 +312,7 @@ if(WIN32)
 			set(PNG_DLL "" CACHE FILEPATH "Path to libpng DLL for installation (optional)")
 			set(JPEG_DLL "" CACHE FILEPATH "Path to libjpeg DLL for installation (optional)")
 			set(SDL2_DLL "" CACHE FILEPATH "Path to SDL2 DLL for installation (optional)")
+			set(LIBZIP_DLL "" CACHE FILEPATH "Path to libzip DLL for installation (optional)")
 		endif()
 		if(BUILD_CLIENT AND ENABLE_SOUND)
 			set(OPENAL_DLL "" CACHE FILEPATH "Path to OpenAL DLL for installation (optional)")
@@ -716,6 +718,7 @@ if(BUILD_CLIENT)
 	target_link_libraries(
 		${PROJECT_NAME}
 		${ZLIB_LIBRARIES}
+		libzip::zip
 		IrrlichtMt::IrrlichtMt
 		${ZSTD_LIBRARY}
 		${SOUND_LIBRARIES}
@@ -918,10 +921,7 @@ if(MSVC)
 	# Visual Studio
 	add_compile_definitions(_WIN32_WINNT=0x0601 WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 	# EHa enables SEH exceptions (used for catching segfaults)
-	set(CMAKE_CXX_FLAGS_RELEASE "/EHa /Ox /MD /GS- /Zi /fp:fast /D NDEBUG /D _HAS_ITERATOR_DEBUGGING=0")
-	if(CMAKE_SIZEOF_VOID_P EQUAL 4)
-		set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /arch:SSE")
-	endif()
+	set(CMAKE_CXX_FLAGS_RELEASE "/EHa /Ox /MD /GS- /Zi /fp:precise /fp:except- /D NDEBUG /D _HAS_ITERATOR_DEBUGGING=0")
 
 	set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/INCREMENTAL:NO /DEBUG /OPT:REF /OPT:ICF /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
 
@@ -1062,6 +1062,9 @@ if(WIN32)
 			endif()
 			if(SDL2_DLL)
 				install(FILES ${SDL2_DLL} DESTINATION ${BINDIR})
+			endif()
+			if(LIBZIP_DLL)
+				install(FILES ${LIBZIP_DLL} DESTINATION ${BINDIR})
 			endif()
 			if(FREETYPE_DLL)
 				install(FILES ${FREETYPE_DLL} DESTINATION ${BINDIR})
