@@ -1067,7 +1067,7 @@ GUIHyperText::GUIHyperText(const wchar_t *text, IGUIEnvironment *environment,
 		video::SColor default_background_color,
 		video::SColor default_color,
 		bool is_hypertip) :
-		IGUIElement(EGUIET_ELEMENT, environment, parent, id, rectangle),
+		IGUIElement(EGUIET_CUSTOM_HYPERTEXT, environment, parent, id, rectangle),
 		m_tsrc(tsrc), m_vscrollbar(nullptr),
 		m_drawer(text, client, environment, tsrc, default_background_color, default_color),
 		m_text_scrollpos(0, 0),
@@ -1168,6 +1168,52 @@ bool GUIHyperText::OnEvent(const SEvent &event)
 			m_drawer.draw(m_display_text_rect, m_text_scrollpos);
 			checkHover(event.MouseInput.X, event.MouseInput.Y);
 			return true;
+
+		} else if (event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN &&
+				event.MouseInput.Simulated) {
+			if (m_vscrollbar->isVisible() &&
+					m_vscrollbar->getMax() > m_vscrollbar->getMin() &&
+					AbsoluteRect.isPointInside(core::position2d<s32>(
+							event.MouseInput.X, event.MouseInput.Y))) {
+				s32 totalheight = m_drawer.getHeight();
+				float scale = (float)(totalheight - AbsoluteRect.getHeight()) /
+						(m_vscrollbar->getMax() - m_vscrollbar->getMin());
+				m_swipe_start_y = event.MouseInput.Y +
+						m_vscrollbar->getPos() / scale;
+			}
+			return true;
+
+		} else if (event.MouseInput.Event == EMIE_LMOUSE_LEFT_UP &&
+				event.MouseInput.Simulated) {
+			m_swipe_start_y = -1;
+			if (m_swipe_started) {
+				m_swipe_started = false;
+				return true;
+			}
+
+		} else if (event.MouseInput.Event == EMIE_MOUSE_MOVED &&
+				event.MouseInput.Simulated && m_swipe_start_y != -1 &&
+				m_vscrollbar->getMax() > m_vscrollbar->getMin()) {
+			double screen_dpi = RenderingEngine::getDisplayDensity() * 96;
+			s32 totalheight = m_drawer.getHeight();
+			float scale = (float)(totalheight - AbsoluteRect.getHeight()) /
+					(m_vscrollbar->getMax() - m_vscrollbar->getMin());
+
+			if (!m_swipe_started &&
+					std::abs(m_swipe_start_y - event.MouseInput.Y -
+							m_vscrollbar->getPos() / scale) >
+							0.1 * screen_dpi) {
+				m_swipe_started = true;
+				Environment->setFocus(this);
+			}
+
+			if (m_swipe_started) {
+				m_swipe_pos = (float)(m_swipe_start_y -
+						event.MouseInput.Y) * scale;
+				m_vscrollbar->setPos((int)m_swipe_pos);
+				m_text_scrollpos.Y = -m_vscrollbar->getPos();
+				return true;
+			}
 
 		} else if (event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN) {
 			ParsedText::Element *element = getElementAt(

@@ -196,7 +196,9 @@ TouchControls::TouchControls(IrrlichtDevice *device, ISimpleTextureSource *tsrc)
 		m_receiver(device->getEventReceiver()),
 		m_texturesource(tsrc)
 {
-	m_screensize = m_device->getVideoDriver()->getScreenSize();
+	m_screensize = RenderingEngine::getWindowSize();
+	if (m_screensize.X == 0 || m_screensize.Y == 0)
+		m_screensize = m_device->getVideoDriver()->getScreenSize();
 	m_button_size = ButtonLayout::getButtonSize(m_screensize);
 
 	readSettings();
@@ -370,9 +372,23 @@ IGUIImage *TouchControls::makeButtonDirect(touch_gui_button_id id,
 	return btn_gui_button;
 }
 
-bool TouchControls::isHotbarButton(const SEvent &event)
+v2s32 TouchControls::getTouchPosition(const SEvent &event) const
 {
-	const v2s32 touch_pos = v2s32(event.TouchInput.X, event.TouchInput.Y);
+	v2u32 physical_size = m_device->getVideoDriver()->getScreenSize();
+	v2s32 touch_pos(event.TouchInput.X, event.TouchInput.Y);
+
+	// Touch coordinates are physical-screen coordinates, while the HUD and
+	// touch controls use the virtual size of one stereo view.
+	if (m_screensize.X < physical_size.X)
+		touch_pos.X %= m_screensize.X;
+	if (m_screensize.Y < physical_size.Y)
+		touch_pos.Y %= m_screensize.Y;
+
+	return touch_pos;
+}
+
+bool TouchControls::isHotbarButton(const v2s32 &touch_pos)
+{
 	// check if hotbar item is pressed
 	for (auto &[index, rect] : m_hotbar_rects) {
 		if (rect.isPointInside(touch_pos)) {
@@ -453,9 +469,9 @@ void TouchControls::translateEvent(const SEvent &event)
 
 	const s32 half_button_size = m_button_size / 2.0f;
 	const s32 fixed_joystick_range_sq = half_button_size * half_button_size * 3 * 3;
-	const s32 X = event.TouchInput.X;
-	const s32 Y = event.TouchInput.Y;
-	const v2s32 touch_pos = v2s32(X, Y);
+	const v2s32 touch_pos = getTouchPosition(event);
+	const s32 X = touch_pos.X;
+	const s32 Y = touch_pos.Y;
 	const v2s32 fixed_joystick_center = v2s32(half_button_size * 5,
 			m_screensize.Y - half_button_size * 5);
 	const v2s32 dir_fixed = touch_pos - fixed_joystick_center;
@@ -499,7 +515,7 @@ void TouchControls::translateEvent(const SEvent &event)
 			return;
 
 		// handle hotbar
-		if (isHotbarButton(event))
+		if (isHotbarButton(touch_pos))
 			// already handled in isHotbarButton()
 			return;
 
@@ -625,7 +641,9 @@ void TouchControls::applyJoystickStatus()
 
 void TouchControls::step(float dtime)
 {
-	v2u32 screensize = m_device->getVideoDriver()->getScreenSize();
+	v2u32 screensize = RenderingEngine::getWindowSize();
+	if (screensize.X == 0 || screensize.Y == 0)
+		screensize = m_device->getVideoDriver()->getScreenSize();
 	s32 button_size = ButtonLayout::getButtonSize(screensize);
 
 	if (m_screensize != screensize || m_button_size != button_size) {

@@ -11,6 +11,7 @@
 #include "rect.h"
 
 #include "guiScrollBar.h"
+#include "client/renderingengine.h"
 
 using namespace gui;
 
@@ -53,6 +54,46 @@ void GUIEditBoxWithScrollBar::draw()
 	}
 
 	CGUIEditBox::draw();
+}
+
+bool GUIEditBoxWithScrollBar::OnEvent(const SEvent &event)
+{
+	if (event.EventType == EET_MOUSE_INPUT_EVENT && VScrollBar &&
+			VScrollBar->isVisible() && event.MouseInput.Simulated) {
+		core::position2d<s32> pos(event.MouseInput.X, event.MouseInput.Y);
+
+		if (event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN) {
+			if (AbsoluteRect.isPointInside(pos) &&
+					VScrollBar->getMax() > VScrollBar->getMin()) {
+				m_swipe_start_y = event.MouseInput.Y + VScrollBar->getPos();
+			}
+		} else if (event.MouseInput.Event == EMIE_LMOUSE_LEFT_UP) {
+			m_swipe_start_y = -1;
+			if (m_swipe_started) {
+				m_swipe_started = false;
+				return true;
+			}
+		} else if (event.MouseInput.Event == EMIE_MOUSE_MOVED &&
+				m_swipe_start_y != -1) {
+			double screen_dpi = RenderingEngine::getDisplayDensity() * 96;
+
+			if (!m_swipe_started &&
+					std::abs(m_swipe_start_y - event.MouseInput.Y -
+							VScrollBar->getPos()) >
+							0.1 * screen_dpi) {
+				m_swipe_started = true;
+				Environment->setFocus(this);
+			}
+
+			if (m_swipe_started) {
+				m_swipe_pos = (float)(m_swipe_start_y - event.MouseInput.Y);
+				VScrollBar->setPos((s32)m_swipe_pos);
+				return true;
+			}
+		}
+	}
+
+	return CGUIEditBox::OnEvent(event);
 }
 
 //! create a vertical scroll bar

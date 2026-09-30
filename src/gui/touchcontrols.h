@@ -220,7 +220,8 @@ private:
 			const recti &rect, bool visible);
 
 	// handle pressing hotbar items
-	bool isHotbarButton(const SEvent &event);
+	bool isHotbarButton(const v2s32 &touch_pos);
+	v2s32 getTouchPosition(const SEvent &event) const;
 
 	// handle release event
 	void handleReleaseEvent(size_t pointer_id);

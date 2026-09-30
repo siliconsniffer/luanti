@@ -27,6 +27,8 @@ public:
 	//! Change the background color
 	void setBackgroundColor(const video::SColor &bg_color);
 
+	bool OnEvent(const SEvent &event) override;
+
 protected:
 	//! create a Vertical ScrollBar
 	void createVScrollBar();
@@ -35,8 +37,11 @@ protected:
 	video::SColor m_bg_color;
 
 	ISimpleTextureSource *m_tsrc;
+
+	bool m_swipe_started = false;
+	s32 m_swipe_start_y = -1;
+	float m_swipe_pos = 0;
 };
 
 
 #endif // GUIEDITBOXWITHSCROLLBAR_HEADER
-

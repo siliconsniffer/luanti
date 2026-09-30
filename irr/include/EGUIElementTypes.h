@@ -73,6 +73,9 @@ enum EGUI_ELEMENT_TYPE
 	//! GUI table
 	EGUIET_CUSTOM_GUITABLE,
 
+	//! Hypertext
+	EGUIET_CUSTOM_HYPERTEXT,
+
 	//! This enum is never used, it only forces the compiler to compile this enumeration to 32 bit.
 	EGUIET_FORCE_32_BIT = 0x7fffffff
 

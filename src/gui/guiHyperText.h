@@ -225,6 +225,9 @@ protected:
 	u32 m_scrollbar_width;
 	core::rect<s32> m_display_text_rect;
 	core::position2d<s32> m_text_scrollpos;
+	bool m_swipe_started = false;
+	s32 m_swipe_start_y = -1;
+	float m_swipe_pos = 0;
 
 	ParsedText::Element *getElementAt(s32 X, s32 Y);
 	void checkHover(s32 X, s32 Y);
